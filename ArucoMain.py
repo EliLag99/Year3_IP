@@ -1,74 +1,126 @@
 import cv2
+import sys
 import time
-#import serial
+import serial
+import RPi.GPIO as gpio
 from picamera import PiCamera
 
-ARUCO = cv2.aruco.DICT_5X5_50
+import UnicornControl as uctrl
+import GPIOControl as gctrl
 
-LEFT_TAG = 3
-RIGHT_TAG = 1
-START_TAG = 2
-STOP_TAG = 0
+#####SETUP AND CONFIGURATION#####
 
-#ser = serial.Serial(
-#        port='/dev/ttyS0', #Replace ttyS0 with ttyAM0 for Pi1,Pi2,Pi0
-#        baudrate = 9600,
-#        parity=serial.PARITY_NONE,
-#        stopbits=serial.STOPBITS_ONE,
-#        bytesize=serial.EIGHTBITS,
-#        timeout=1
-#)
+#Tag IDS
+LEFT = 0
+RIGHT = 1
+START = 2
+STOP = 3
 
-class gate:
-    def __init__(self, corners):
-        self.corners = corners
-        self.size = abs(corners[0] - corners[1])
-        
-def middle(corners):
-    return(corners[0][0]+corners[1][0]) / 2
+#Pin Definitions
+HR = 19
+R = 13
+S = 6
+L = 5
+HL = 0
 
-arucoDict = cv2.aruco.Dictionary_get(ARUCO)
+ON = 10
+NG = 9
+NA = 11
+
+#Serial Port
+ser = serial.Serial(
+    #ttyS0 for Pi3, Pi4; ttyAM0 for Pi1, Pi2, PiZero
+    port='/dev/ttyS0',
+    baudrate = 9600,
+    parity=serial.PARITY_NONE,
+    stopbits=serial.STOPBITS_ONE,
+    bytesize=serial.EIGHTBITS,
+    timeout=1
+)
+
+#Pin Setup
+gpio.setmode(gpio.BCM)
+gpio.setup(HL, gpio.OUT)
+gpio.setup(L, gpio.OUT)
+gpio.setup(S, gpio.OUT)
+gpio.setup(R, gpio.OUT)
+gpio.setup(HR, gpio.OUT)
+gpio.setup(ON, gpio.OUT)
+gpio.setup(NG, gpio.OUT)
+gpio.setup(NA, gpio.OUT)
+
+#Aruco Setup
+arucoDict = cv2.aruco.Dictionary_create(4,4)
 arucoParams = cv2.aruco.DetectorParameters_create()
 
-
-i=0
-
+#Camera Setup
 cam = cv2.VideoCapture(0)
-print(cam.isOpened())
+if(cam.isOpened == False):
+    sys.exit()
+gpio.output(ON, gpio.HIGH)
+cam.set(3, 1280)
+cam.set(4, 720)
+_, img = cam.read()
+imgCenterX = img.shape[0]/2
 
+#################################
+
+class gate:
+    def __init__(self, corners, ID):
+        self.ID = ID
+        self.corners = corners
+        self.size = abs(corners[0][0] - corners[1][0])
+
+def resetPins():
+    gpio.output(HR, gpio.LOW)
+    gpio.output(R, gpio.LOW)
+    gpio.output(S, gpio.LOW)
+    gpio.output(L, gpio.LOW)
+    gpio.output(HL, gpio.LOW)
+    gpio.output(NG, gpio.LOW)
+    gpio.output(NA, gpio.LOW)
+
+resetPins()
 while(True):
-    left, right = [], []
+    tags = []
     _, img = cam.read()
     (cornerpts, ids, rejected) = cv2.aruco.detectMarkers(img, arucoDict, parameters=arucoParams)
-    if(cornerpts == []):
-        i+=1
-        if(i%10 == 0):
-            print(i, "rounds without marker detected")
-        if(i > 60):
-            print("No gates detected for a while... Stopping")
-            break;
-    elif(len(ids)==1 and ids[0] == STOP_TAG):
-        print("Stop Tag detected... Stopping")
-        break
+    
+    if(cornerpts == [] or len(ids) == 1):
+        uctrl.noGates()
+        gpio.output(NG, gpio.HIGH)
+
     else:
-        i=0
+        counter=0
         print(len(ids), '\n')
         for j in range(len(ids)):
-            g = gate(cornerpts[j][0])
-            
-            if(ids[j] == LEFT_TAG):
-                left.append(g)
-            elif(ids[j] == RIGHT_TAG):
-                right.append(g)
-            print("Corners:", cornerpts[j][0])
-            
-            print("ID: ", ids[j])
-            #ser.write(str.encode("Distance: %i\n" %(distance)))            
+            g = gate(cornerpts[j][0], ids[j])
+            tags.append(g)           
 
-        #left.sort(key = lambda gate: gate.size, reverse = True)
-        #right.sort(key = lambda gate: gate.size, reverse = True)
-        if(len(left) != 0 and len(right) != 0):
-            target = (middle(left[0].corners) + middle(right[0].corners)) / 2
+        tags.sort(key = lambda gate: gate.size, reverse = True)
+        
+        if((tags[0].ID == LEFT and tags[1].ID == RIGHT) or  (tags[0].ID == LEFT and tags[1].ID == RIGHT)):
+            target = (tags[0].corners[0][0] + tags[1].corners[1][0]) / 2
             print("Left and Right gate recognized, centre: ", target)
+            resetPins()
+            gpio.output(NG, gpio.LOW)
+            if(target < 0.4*imgCenterX):
+                uctrl.hleft()
+                gctrl.hleft()
+            elif(0.4*imgCenterX < target < 0.8*imgCenterX):
+                uctrl.left()
+                gctrl.hleft()
+            elif(0.8*imgCenterX < target < 1.2*imgCenterX):
+                uctrl.straight()
+                gctrl.straight()
+            elif(1.2*imgCenterX < target < 1.6*imgCenterX):
+                uctrl.right()
+                gctrl.right()
+            elif(1.6*imgCenterX < target):
+                uctrl.hright()
+                gctrl.hright()
+        else:
+            uctrl.noGates()
+            gpio.output(NG, gpio.HIGH)
 
 cam.release()
