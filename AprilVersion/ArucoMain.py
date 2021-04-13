@@ -23,9 +23,9 @@ S = 6
 L = 5
 HL = 0
 
-ON = 10
-NG = 9
-NA = 11
+START_DETECTED = 10
+NO_GATE = 9
+NEW_GATE = 11
 
 #Serial Port
 ser = serial.Serial(
@@ -45,7 +45,7 @@ gpio.setup(L, gpio.OUT)
 gpio.setup(S, gpio.OUT)
 gpio.setup(R, gpio.OUT)
 gpio.setup(HR, gpio.OUT)
-gpio.setup(NEW_MARKER, gpio.OUT)
+gpio.setup(NEW_GATE, gpio.OUT)
 gpio.setup(NO_GATE, gpio.OUT)
 gpio.setup(START_DETECTED, gpio.OUT)
 
@@ -57,9 +57,6 @@ arucoParams = cv2.aruco.DetectorParameters_create()
 cam = cv2.VideoCapture(0)
 if(cam.isOpened == False):
     sys.exit()
-gpio.output(ON, gpio.HIGH)
-#cam.set(3, 1280)
-#cam.set(4, 720)
 _, img = cam.read()
 cam.release()
 print(img.shape)
@@ -79,11 +76,14 @@ def resetPins():
     gpio.output(S, gpio.LOW)
     gpio.output(L, gpio.LOW)
     gpio.output(HL, gpio.LOW)
-    gpio.output(NG, gpio.LOW)
-    gpio.output(NA, gpio.LOW)
-
+    gpio.output(NO_GATE, gpio.LOW)
+    gpio.output(NEW_GATE, gpio.LOW)
+    gpio.output(START_DETECTED, gpio.LOW)
+    
 resetPins()
+
 while(True):
+    tags = []
     cam = cv2.VideoCapture(0)
     if(cam.isOpened == False):
         gpio.output(ON, gpio.LOW)
@@ -98,8 +98,11 @@ while(True):
 
         tags.sort(key = lambda gate: gate.size, reverse = True)
     
-    if(tags[0].id != START):
+    if(tags[0].ID != START):
         continue;
+    
+    gpio.output(START_DETECTED, gpio.HIGH)
+    closestGate = 0;
     
     while(True):
         cam = cv2.VideoCapture(0)
@@ -113,9 +116,10 @@ while(True):
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         (cornerpts, ids, rejected) = cv2.aruco.detectMarkers(gray, arucoDict, parameters=arucoParams)
         
-        if(cornerpts == [] or len(ids) == 1):
+        if(cornerpts == []):
             uctrl.noGates()
-            gpio.output(NG, gpio.HIGH)
+            gpio.output(NO_GATE, gpio.HIGH)
+            ser.write("No gates\n")
 
         else:
             print(len(ids), '\n')
@@ -126,13 +130,21 @@ while(True):
 
             tags.sort(key = lambda gate: gate.size, reverse = True)
             
-            if((tags[0].ID == 0 and tags[1].ID == 1) or  (tags[0].ID == 1 and tags[1].ID == 0)):
-                print("Corners Tag[0]: ", tags[0].corners)
-                print("Corners Tag[1]: ", tags[1].corners)
+            if(ids[0] == STOP):
+                break;
+            
+            if((len(ids) >= 2) and ((tags[0].ID == 0 and tags[1].ID == 1) or  (tags[0].ID == 1 and tags[1].ID == 0))):
+                size = tags[0].corners[3][1] - tags[0].corners[0][1]
+                
+                if(size < closestGate):
+                    gpio.output(NEW_GATE, not gpio.input(NEW_GATE))
+                closestGate = size
+                
                 target = (tags[0].corners[0][0] + tags[1].corners[1][0]) / 2
                 print("Left and Right gate recognized, centre: ", target, "\tImage center: ", imgCenterX)
                 resetPins()
-                gpio.output(NG, gpio.LOW)
+                gpio.output(NO_GATE, gpio.LOW)
+                ser.write('Target: %d, IMGCENTER: %d, Size: %d\n', target, imgCenterX, size)
                 if(target < 0.4*imgCenterX):
                     uctrl.hleft()
                     gctrl.hleft()
@@ -150,6 +162,8 @@ while(True):
                     gctrl.hright()
             else:
                 uctrl.noGates()
-                gpio.output(NG, gpio.HIGH)
+                gpio.output(NO_GATE, gpio.HIGH)
+                ser.write("No Gates\n")
 
-    cam.release()
+    gpio.output(START_DETECTED, gpio.LOW)
+    
