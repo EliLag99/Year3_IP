@@ -1,3 +1,6 @@
+#The functions and images for the Unicorn Hat
+#10-05-2021
+
 import unicornhat as uh
 
 uh.set_layout(uh.HAT)
