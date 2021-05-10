@@ -1,3 +1,5 @@
+#The GPIO control file; an alternative to the built-in GPIO control
+
 import RPi.GPIO as gpio
 
 HR = 19

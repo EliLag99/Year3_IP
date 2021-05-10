@@ -1,3 +1,5 @@
+#The main file for testing with the Unicorn Hat
+
 import cv2
 import sys
 import time

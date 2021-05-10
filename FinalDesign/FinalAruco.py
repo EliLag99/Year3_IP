@@ -77,6 +77,7 @@ def resetPins():
     gpio.output(NO_GATE, gpio.LOW)
     
 while(True):
+    #Waiting for Start Tag...
     resetPins()
     gpio.output(START_DETECTED, gpio.LOW)
     gpio.output(NEW_GATE, gpio.LOW)
@@ -97,9 +98,10 @@ while(True):
     tags.sort(key = lambda gate: gate.size, reverse = True)
     
     if(tags[0].ID != START):
-        continue;
+        continue
     
-    closestGate = 0;
+    #Start Tag found
+    closestGate = 0
     gpio.output(START_DETECTED, gpio.HIGH)
     
     while(True):
@@ -124,11 +126,13 @@ while(True):
                 g = gate(cornerpts[j][0], ids[j])
                 tags.append(g)           
 
+            #Sort Tags by vertical size
             tags.sort(key = lambda gate: gate.size, reverse = True)
             
             if(ids[0] == STOP):
-                break;
+                break
             
+            #Check conditions for first two markers to form gate
             if((len(ids) >= 2) and ((tags[0].ID == 0 and tags[1].ID == 1 and tags[0].corners[0][0] < tags[1].corners[0][0]) or  (tags[0].ID == 1 and tags[1].ID == 0 and tags[0].corners[0][0] > tags[1].corners[0][0]))):
                 if(tags[1].size > 0.75*tags[0].size):
                     if(tags[0].size < closestGate):
@@ -137,6 +141,7 @@ while(True):
                     
                     target = (tags[0].corners[0][0] + tags[1].corners[1][0]) / 2
                     uart.write('Target: %d, IMGCENTER: %d, Size: %d\n'%(target, imgCenterX, tags[0].size))
+                    #Determine outputs based on position relative to center of image
                     if(target < 0.4*imgCenterX):
                         gpio.output(HL, gpio.HIGH)
                     elif(0.4*imgCenterX < target < 0.8*imgCenterX):
