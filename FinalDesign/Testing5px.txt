@@ -1,0 +1,31 @@
+###TESTING ARUCOS###
+Distance: 30cm
+2	2	2	2	
+Distance: 45cm
+2	2	2	2	
+Distance: 60cm
+2	2	2	2	
+Distance: 75cm
+2	2	0	2	
+Distance: 90cm
+2	0	2	2	
+Distance: 105cm
+2	2	2	2	
+Distance: 120cm
+2	2	2	0	
+Distance: 135cm
+0	0	0	2	
+Distance: 150cm
+2	0	0	2	
+Distance: 165cm
+2	2	2	2	
+Distance: 180cm
+2	2	2	2	
+Distance: 195cm
+2	0	1	2	
+Distance: 210cm
+0	2	2	2	
+Distance: 225cm
+1	0	0	2	
+Distance: 240cm
+2	0	1	0	
