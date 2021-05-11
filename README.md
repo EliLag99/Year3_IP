@@ -13,4 +13,10 @@ File Structure:
 
 
 USE:
-The file "FinalAruco.py" is all that is required, has to be run with Python 2 for now, but without needing root access.
+The file "FinalAruco.py" is all that is required without needing root access, to run final version.
+To run navigate to directory in terminal and execute
+python FinalAruco.py
+
+To get Unicorn Hat implementation, use "ArucoMainNew.py" in combination with "UnicornControl.py"
+Navigate to directory and execute
+sudo python ArucoMainNew.py
